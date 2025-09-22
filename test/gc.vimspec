@@ -1,0 +1,74 @@
+Describe 'Mista GC (Garbage Collection)'
+  Before all
+    source test/.themisrc
+    let s:assert = themis#helper('assert')
+  End
+
+  After all
+    " Clean up
+    for buf in range(1, bufnr('$'))
+      if bufexists(buf) && getbufvar(buf, 'mista_buffer', 0)
+        execute 'bwipeout!' buf
+      endif
+    endfor
+  End
+
+  Describe 'Buffer cleanup on BufDelete'
+    It 'removes buffer state from global variables when buffer is deleted'
+      " Create a test markdown buffer
+      let test_bufnr = g:Create_test_markdown_buffer()
+      
+      " Open Mista
+      execute 'buffer' test_bufnr
+      Mista
+      
+      " Verify state is saved
+      call s:assert.has_key(g:mista#buffer_args, test_bufnr)
+      call s:assert.has_key(g:mista#buffer_cursor_pos, test_bufnr)
+      call s:assert.has_key(g:mista#buffer_state, test_bufnr)
+      
+      " Delete the source buffer
+      execute 'bwipeout!' test_bufnr
+      
+      " Verify state is cleaned up
+      call s:assert.false(has_key(g:mista#buffer_args, test_bufnr))
+      call s:assert.false(has_key(g:mista#buffer_cursor_pos, test_bufnr))
+      call s:assert.false(has_key(g:mista#buffer_state, test_bufnr))
+    End
+    
+    It 'handles cleanup for multiple buffers'
+      " Create first test buffer
+      let bufnr1 = g:Create_test_markdown_buffer()
+      execute 'buffer' bufnr1
+      Mista ##
+      
+      " Close the first Mista buffer
+      let mista_buf1 = g:Get_mista_buffer()
+      if mista_buf1 > 0
+        execute 'bwipeout!' mista_buf1
+      endif
+      
+      " Create second test buffer
+      let bufnr2 = g:Create_test_markdown_buffer()
+      execute 'buffer' bufnr2
+      Mista ###
+      
+      " Verify both have state
+      call s:assert.has_key(g:mista#buffer_state, bufnr1)
+      call s:assert.has_key(g:mista#buffer_state, bufnr2)
+      
+      " Delete first buffer
+      execute 'bwipeout!' bufnr1
+      
+      " Verify only first buffer's state is removed
+      call s:assert.false(has_key(g:mista#buffer_state, bufnr1))
+      call s:assert.has_key(g:mista#buffer_state, bufnr2)
+      
+      " Delete second buffer
+      execute 'bwipeout!' bufnr2
+      
+      " Verify both are removed
+      call s:assert.false(has_key(g:mista#buffer_state, bufnr2))
+    End
+  End
+End

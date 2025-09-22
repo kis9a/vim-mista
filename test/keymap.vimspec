@@ -1,0 +1,144 @@
+let s:assert = themis#helper('assert')
+
+Describe 'Mista Keymaps'
+  Before each
+    let s:test_bufnr = g:Create_test_markdown_buffer()
+    Mista
+    let s:mista_buf = g:Get_mista_buffer()
+    execute 'buffer' s:mista_buf
+  End
+
+  After each
+    let mista_buf = g:Get_mista_buffer()
+    if mista_buf > 0
+      execute 'bwipeout!' mista_buf
+    endif
+    if bufexists(s:test_bufnr)
+      execute 'bwipeout!' s:test_bufnr
+    endif
+  End
+
+  Describe 'Default buffer keymaps'
+    It 'has default keymaps defined'
+      " Check that default keymaps dictionary exists
+      call s:assert.true(exists('g:mista#buffer_keymaps_default'))
+      call s:assert.is_dict(g:mista#buffer_keymaps_default)
+      
+      " Check for expected keys
+      call s:assert.has_key(g:mista#buffer_keymaps_default, '<CR>')
+      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mq')
+      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mp')
+      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mn')
+      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mk')
+      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mr')
+      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mh')
+    End
+
+    It 'applies buffer-local mappings'
+      " Check that mappings are applied in the Mista buffer as buffer-local
+      " Use maparg() with dictionary format to check buffer-local property
+      
+      let m = maparg('<CR>', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), '<CR> should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaJump')
+      
+      let m = maparg('mq', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), 'mq should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaClose')
+      
+      let m = maparg('mp', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), 'mp should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaPrev')
+      
+      let m = maparg('mn', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), 'mn should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaNext')
+      
+      let m = maparg('mk', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), 'mk should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaKeep')
+      
+      let m = maparg('mr', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), 'mr should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaReject')
+      
+      let m = maparg('mh', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), 'mh should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaHelp')
+    End
+  End
+
+  Describe 'User keymap overrides'
+    Before
+      " Save original user keymaps
+      let s:saved_keymaps = deepcopy(g:mista#buffer_keymaps)
+    End
+
+    After
+      " Restore original user keymaps
+      let g:mista#buffer_keymaps = s:saved_keymaps
+    End
+
+    It 'allows user to override specific keymaps'
+      " Set a custom override
+      let g:mista#buffer_keymaps = {
+        \ '<CR>': {'mode': 'n', 'rhs': ':echo "custom"<CR>', 'opts': '<silent>'},
+        \ }
+      
+      " Create new Mista buffer to apply the override
+      execute 'bwipeout!' s:mista_buf
+      execute 'buffer' s:test_bufnr
+      Mista
+      let s:mista_buf = g:Get_mista_buffer()
+      execute 'buffer' s:mista_buf
+      
+      " Check that the override was applied
+      call s:assert.match(maparg('<CR>', 'n'), 'echo "custom"')
+      
+      " Check that other defaults are still intact
+      call s:assert.match(maparg('mq', 'n'), 'MistaClose')
+    End
+
+    It 'merges user overrides with defaults'
+      " Set partial overrides
+      let g:mista#buffer_keymaps = {
+        \ 'K': {'mode': 'n', 'rhs': ':MistaKeep ', 'opts': ''},
+        \ 'R': {'mode': 'n', 'rhs': ':MistaReject ', 'opts': ''},
+        \ }
+      
+      " Create new Mista buffer
+      execute 'bwipeout!' s:mista_buf
+      execute 'buffer' s:test_bufnr
+      Mista
+      let s:mista_buf = g:Get_mista_buffer()
+      execute 'buffer' s:mista_buf
+      
+      " Check that new mappings are added
+      call s:assert.not_empty(maparg('K', 'n'))
+      call s:assert.match(maparg('K', 'n'), 'MistaKeep')
+      
+      call s:assert.not_empty(maparg('R', 'n'))
+      call s:assert.match(maparg('R', 'n'), 'MistaReject')
+      
+      " Check that defaults are still there
+      call s:assert.match(maparg('mq', 'n'), 'MistaClose')
+      call s:assert.match(maparg('mp', 'n'), 'MistaPrev')
+    End
+  End
+
+  Describe 'Buffer-local scope'
+    It 'applies mappings only to Mista buffer'
+      " Check mappings in Mista buffer
+      call s:assert.not_empty(maparg('<CR>', 'n'))
+      call s:assert.match(maparg('<CR>', 'n'), 'MistaJump')
+      
+      " Switch to source buffer
+      execute 'buffer' s:test_bufnr
+      
+      " Mappings should not exist in source buffer
+      " (or should be different if user has global mappings)
+      let source_cr = maparg('<CR>', 'n')
+      call s:assert.true(empty(source_cr) || source_cr !~# 'MistaJump')
+    End
+  End
+End

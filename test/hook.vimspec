@@ -1,0 +1,221 @@
+let s:assert = themis#helper('assert')
+
+Describe 'Mista Hooks'
+  Before each
+    " Reset hooks
+    let g:mista#hooks = {}
+    
+    " Create test tracking variables
+    let g:test_hook_called = {}
+    let g:test_hook_order = []
+    
+    " Helper functions for testing
+    function! g:TestHookBefore(payload) abort
+      let g:test_hook_called['before'] = 1
+      call add(g:test_hook_order, 'before')
+    endfunction
+    
+    function! g:TestHookAfter(payload) abort
+      let g:test_hook_called['after'] = 1
+      call add(g:test_hook_order, 'after')
+    endfunction
+    
+    function! g:TestHookPriority1(payload) abort
+      call add(g:test_hook_order, 'priority1')
+    endfunction
+    
+    function! g:TestHookPriority2(payload) abort
+      call add(g:test_hook_order, 'priority2')
+    endfunction
+    
+    let s:test_bufnr = g:Create_test_markdown_buffer()
+  End
+
+  After each
+    let mista_buf = g:Get_mista_buffer()
+    if mista_buf > 0
+      execute 'bwipeout!' mista_buf
+    endif
+    if bufexists(s:test_bufnr)
+      execute 'bwipeout!' s:test_bufnr
+    endif
+    
+    " Clean up test functions
+    delfunction g:TestHookBefore
+    delfunction g:TestHookAfter
+    delfunction g:TestHookPriority1
+    delfunction g:TestHookPriority2
+  End
+
+  Describe 'Hook execution'
+    It 'executes before and after hooks for open event'
+      let g:mista#hooks = {
+        \ 'open': [
+        \   {'hook': function('g:TestHookBefore'), 'stage': 'before', 'priority': 10},
+        \   {'hook': function('g:TestHookAfter'), 'stage': 'after', 'priority': 10}
+        \ ]
+        \ }
+      
+      Mista
+      
+      call s:assert.has_key(g:test_hook_called, 'before')
+      call s:assert.has_key(g:test_hook_called, 'after')
+      call s:assert.equals(g:test_hook_order, ['before', 'after'])
+    End
+
+    It 'executes hooks in priority order'
+      let g:mista#hooks = {
+        \ 'open': [
+        \   {'hook': function('g:TestHookPriority2'), 'stage': 'after', 'priority': 20},
+        \   {'hook': function('g:TestHookPriority1'), 'stage': 'after', 'priority': 10}
+        \ ]
+        \ }
+      
+      Mista
+      
+      " Lower priority number should execute first
+      call s:assert.equals(g:test_hook_order, ['priority1', 'priority2'])
+    End
+
+    It 'supports string hooks (execute command)'
+      let g:mista#hooks = {
+        \ 'open': [
+        \   {'hook': 'let g:test_hook_called["string"] = 1', 'stage': 'after', 'priority': 10}
+        \ ]
+        \ }
+      
+      Mista
+      
+      call s:assert.has_key(g:test_hook_called, 'string')
+    End
+
+    It 'executes filter hooks'
+      let g:mista#hooks = {
+        \ 'filter_keep': [
+        \   {'hook': function('g:TestHookBefore'), 'stage': 'before', 'priority': 10},
+        \   {'hook': function('g:TestHookAfter'), 'stage': 'after', 'priority': 10}
+        \ ]
+        \ }
+      
+      Mista
+      let mista_buf = g:Get_mista_buffer()
+      execute 'buffer' mista_buf
+      
+      MistaKeep Section
+      
+      call s:assert.equals(g:test_hook_order, ['before', 'after'])
+    End
+
+    It 'executes jump hooks'
+      let g:mista#hooks = {
+        \ 'jump': [
+        \   {'hook': function('g:TestHookBefore'), 'stage': 'before', 'priority': 10}
+        \ ]
+        \ }
+      
+      Mista ##
+      let mista_buf = g:Get_mista_buffer()
+      execute 'buffer' mista_buf
+      
+      " Move to a result line and jump
+      normal! 3G
+      MistaJump
+      
+      call s:assert.has_key(g:test_hook_called, 'before')
+    End
+
+    It 'executes history navigation hooks'
+      let g:mista#hooks = {
+        \ 'history_prev': [
+        \   {'hook': 'let g:test_hook_called["prev"] = 1', 'stage': 'after', 'priority': 10}
+        \ ],
+        \ 'history_next': [
+        \   {'hook': 'let g:test_hook_called["next"] = 1', 'stage': 'after', 'priority': 10}
+        \ ]
+        \ }
+      
+      Mista
+      let mista_buf = g:Get_mista_buffer()
+      execute 'buffer' mista_buf
+      
+      " Create history
+      MistaKeep Section
+      
+      " Navigate back
+      MistaPrev
+      call s:assert.has_key(g:test_hook_called, 'prev')
+      
+      " Navigate forward
+      MistaNext
+      call s:assert.has_key(g:test_hook_called, 'next')
+    End
+
+    It 'executes close hooks'
+      let g:mista#hooks = {
+        \ 'close': [
+        \   {'hook': function('g:TestHookBefore'), 'stage': 'before', 'priority': 10},
+        \   {'hook': function('g:TestHookAfter'), 'stage': 'after', 'priority': 10}
+        \ ]
+        \ }
+      
+      Mista
+      let mista_buf = g:Get_mista_buffer()
+      execute 'buffer' mista_buf
+      
+      MistaClose
+      
+      call s:assert.equals(g:test_hook_order, ['before', 'after'])
+    End
+  End
+
+  Describe 'Hook payload'
+    It 'passes payload to hook functions'
+      let g:test_payload = {}
+      
+      function! g:CapturePayload(payload) abort
+        let g:test_payload = a:payload
+      endfunction
+      
+      let g:mista#hooks = {
+        \ 'open': [
+        \   {'hook': function('g:CapturePayload'), 'stage': 'after', 'priority': 10}
+        \ ]
+        \ }
+      
+      Mista ##
+      
+      call s:assert.has_key(g:test_payload, 'arg')
+      call s:assert.has_key(g:test_payload, 'mode')
+      call s:assert.equals(g:test_payload.arg, '##')
+      call s:assert.equals(g:test_payload.mode, 'header')
+      
+      delfunction g:CapturePayload
+    End
+  End
+
+  Describe 'Hook error handling'
+    It 'continues execution if a hook fails'
+      function! g:FailingHook(payload) abort
+        throw 'Test error'
+      endfunction
+      
+      let g:mista#hooks = {
+        \ 'open': [
+        \   {'hook': function('g:FailingHook'), 'stage': 'before', 'priority': 10},
+        \   {'hook': function('g:TestHookAfter'), 'stage': 'after', 'priority': 10}
+        \ ]
+        \ }
+      
+      " Should not prevent Mista from opening
+      Mista
+      
+      let mista_buf = g:Get_mista_buffer()
+      call s:assert.not_equals(mista_buf, -1)
+      
+      " After hook should still run
+      call s:assert.has_key(g:test_hook_called, 'after')
+      
+      delfunction g:FailingHook
+    End
+  End
+End

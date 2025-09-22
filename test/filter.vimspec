@@ -1,0 +1,215 @@
+let s:assert = themis#helper('assert')
+
+Describe 'Mista Filter'
+  Before each
+    let s:test_bufnr = g:Create_test_markdown_buffer()
+    " Open Mista with all lines for testing filters
+    Mista
+    let s:mista_buf = g:Get_mista_buffer()
+    execute 'buffer' s:mista_buf
+  End
+
+  After each
+    let mista_buf = g:Get_mista_buffer()
+    if mista_buf > 0
+      execute 'bwipeout!' mista_buf
+    endif
+    if bufexists(s:test_bufnr)
+      execute 'bwipeout!' s:test_bufnr
+    endif
+  End
+
+  Describe ':MistaKeep'
+    It 'keeps only lines matching the keyword'
+      let initial_count = g:Count_mista_matches()
+      call s:assert.true(initial_count > 0)
+      
+      " Keep only lines with "Section"
+      MistaKeep Section
+      
+      let filtered_count = g:Count_mista_matches()
+      call s:assert.true(filtered_count > 0)
+      call s:assert.true(filtered_count < initial_count)
+      
+      " Check that all remaining lines contain "Section" (case-insensitive)
+      for match in b:mista_matches
+        call s:assert.match(match.text, '\c[Ss]ection')
+      endfor
+    End
+
+    It 'updates the title with filter information'
+      MistaKeep content
+      
+      " Title should show the filter
+      call s:assert.match(getline(1), 'K:content')
+    End
+
+    It 'adds to filter history'
+      let initial_history = len(b:mista_filter_history)
+      
+      MistaKeep Section
+      
+      call s:assert.equals(len(b:mista_filter_history), initial_history + 1)
+      call s:assert.equals(b:mista_filter_history_index, initial_history)
+    End
+
+    It 'handles case-insensitive search by default'
+      " g:mista#case_sensitive defaults to 0
+      MistaKeep section
+      
+      " Should find "Section" even though we searched for "section"
+      call s:assert.true(g:Count_mista_matches() > 0)
+    End
+  End
+
+  Describe ':MistaReject'
+    It 'rejects lines matching the keyword'
+      let initial_count = g:Count_mista_matches()
+      
+      " Reject lines with "content"
+      MistaReject content
+      
+      let filtered_count = g:Count_mista_matches()
+      call s:assert.true(filtered_count < initial_count)
+      
+      " Check that no remaining lines contain "content"
+      for match in b:mista_matches
+        call s:assert.not_match(match.text, 'content')
+      endfor
+    End
+
+    It 'updates the title with reject filter'
+      MistaReject test
+      
+      " Title should show the reject filter
+      call s:assert.match(getline(1), 'R:test')
+    End
+  End
+
+  Describe 'Filter History'
+    It 'navigates through filter history with :MistaPrev'
+      let initial_matches = copy(b:mista_matches)
+      
+      " Apply a filter
+      MistaKeep Section
+      let filtered_matches = copy(b:mista_matches)
+      
+      call s:assert.not_equals(len(initial_matches), len(filtered_matches))
+      
+      " Go back
+      MistaPrev
+      
+      " Should be back to initial state
+      call s:assert.equals(len(b:mista_matches), len(initial_matches))
+      call s:assert.equals(b:mista_filter_history_index, 0)
+    End
+
+    It 'navigates forward with :MistaNext'
+      " Apply filters
+      MistaKeep Section
+      let step1_count = g:Count_mista_matches()
+      
+      MistaKeep Two
+      let step2_count = g:Count_mista_matches()
+      
+      " Go back twice
+      MistaPrev
+      MistaPrev
+      
+      " Now go forward
+      MistaNext
+      call s:assert.equals(g:Count_mista_matches(), step1_count)
+      
+      MistaNext
+      call s:assert.equals(g:Count_mista_matches(), step2_count)
+    End
+
+    It 'shows error when at history boundaries'
+      " Already at the beginning
+      try
+        MistaPrev
+        " Should show message but not error
+      catch
+        call s:assert.fail('Should not throw error')
+      endtry
+      
+      " Go to end of history
+      MistaKeep Section
+      
+      try
+        MistaNext
+        " Should show message but not error
+      catch
+        call s:assert.fail('Should not throw error')
+      endtry
+    End
+
+    It 'truncates forward history when applying new filter from past state'
+      " Create history: initial -> filter1 -> filter2
+      MistaKeep Section
+      let filter1_count = g:Count_mista_matches()
+      
+      MistaKeep Two
+      let filter2_count = g:Count_mista_matches()
+      
+      " Go back to filter1
+      MistaPrev
+      call s:assert.equals(g:Count_mista_matches(), filter1_count)
+      
+      " Apply new filter (creates branch, truncates filter2)
+      MistaKeep One
+      let new_branch_count = g:Count_mista_matches()
+      
+      " Try to go forward - should be at the end
+      try
+        MistaNext
+      catch
+        " Expected - we're at the latest state
+      endtry
+      
+      " History should be: initial -> filter1 -> new_branch
+      call s:assert.equals(len(b:mista_filter_history), 3)
+      call s:assert.equals(b:mista_filter_history_index, 2)
+    End
+  End
+
+  Describe 'Multiple Filters'
+    It 'applies filters sequentially'
+      " Start with all lines
+      let all_count = g:Count_mista_matches()
+      
+      " First filter: keep "Section"
+      MistaKeep Section
+      let first_filter = g:Count_mista_matches()
+      call s:assert.true(first_filter < all_count)
+      
+      " Second filter: reject "Two"
+      MistaReject Two
+      let second_filter = g:Count_mista_matches()
+      call s:assert.true(second_filter < first_filter)
+      
+      " All remaining should have "Section" but not "Two" (case-insensitive)
+      for match in b:mista_matches
+        call s:assert.match(match.text, '\c[Ss]ection')
+        call s:assert.not_match(match.text, '\c[Tt]wo')
+      endfor
+      
+      " Title should show both filters
+      call s:assert.match(getline(1), 'K:Section')
+      call s:assert.match(getline(1), 'R:Two')
+    End
+  End
+
+  Describe ':MistaRedraw'
+    It 'redraws the buffer without changing content'
+      MistaKeep Section
+      let matches_before = copy(b:mista_matches)
+      let title_before = getline(1)
+      
+      MistaRedraw
+      
+      call s:assert.equals(b:mista_matches, matches_before)
+      call s:assert.equals(getline(1), title_before)
+    End
+  End
+End

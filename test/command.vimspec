@@ -1,0 +1,193 @@
+let s:assert = themis#helper('assert')
+
+Describe 'Mista Commands'
+  Before each
+    " Create a fresh markdown buffer for each test
+    let s:test_bufnr = g:Create_test_markdown_buffer()
+  End
+
+  After each
+    " Clean up all Mista buffers (there might be multiple)
+    for buf in range(1, bufnr('$'))
+      if bufexists(buf) && getbufvar(buf, 'mista_buffer', 0)
+        execute 'bwipeout!' buf
+      endif
+    endfor
+    if exists('s:test_bufnr') && bufexists(s:test_bufnr)
+      execute 'bwipeout!' s:test_bufnr
+    endif
+  End
+
+  Describe ':Mista'
+    It 'opens buffer with all lines when no argument provided'
+      Mista
+      
+      " Check that Mista buffer was created
+      let mista_buf = g:Get_mista_buffer()
+      call s:assert.not_equals(mista_buf, -1)
+      
+      " Check buffer name
+      call s:assert.match(bufname(mista_buf), '^_Mista \[buf\d\+\]$')
+      
+      " Switch to Mista buffer and check properties
+      execute 'buffer' mista_buf
+      call s:assert.equals(b:mista_buffer, 1)
+      call s:assert.equals(&buftype, 'nofile')
+      call s:assert.equals(&modifiable, 0)
+    End
+
+    It 'extracts level 2 headers with :Mista ##'
+      Mista ##
+      
+      let mista_buf = g:Get_mista_buffer()
+      call s:assert.not_equals(mista_buf, -1)
+      
+      execute 'buffer' mista_buf
+      call s:assert.match(bufname('%'), '^_Mista ## \[buf\d\+\]$')
+      
+      " Check that we have the correct number of level 2 headers
+      " Expected: Section One, Section Two, Section Three
+      call s:assert.equals(g:Count_mista_matches(), 3)
+      
+      " Check title line
+      call s:assert.match(getline(1), 'Headers (level 2)')
+    End
+
+    It 'searches for keywords with :Mista {keyword}'
+      Mista content
+      
+      let mista_buf = g:Get_mista_buffer()
+      call s:assert.not_equals(mista_buf, -1)
+      
+      execute 'buffer' mista_buf
+      call s:assert.match(bufname('%'), '^_Mista content \[buf\d\+\]$')
+      
+      " Should find lines containing "content"
+      call s:assert.true(g:Count_mista_matches() > 0)
+      
+      " Check title line
+      call s:assert.match(getline(1), 'Search: content')
+    End
+
+    It 'works with any file type'
+      " Create a non-markdown buffer
+      new
+      setlocal filetype=text
+      call setline(1, ['Line 1', 'Line 2', 'Line 3'])
+      
+      " Should work without error
+      Mista
+      
+      " Verify Mista buffer was created
+      let mista_buf = g:Get_mista_buffer()
+      call s:assert.true(mista_buf > 0)
+      
+      " Clean up
+      if mista_buf > 0
+        execute 'bwipeout!' mista_buf
+      endif
+      bwipeout!
+    End
+
+    It 'toggles with :Mista!'
+      " First open with Mista ##
+      Mista ##
+      let mista_buf1 = g:Get_mista_buffer()
+      call s:assert.not_equals(mista_buf1, -1)
+      
+      " Toggle to close
+      execute 'buffer' s:test_bufnr
+      Mista!
+      let mista_buf2 = g:Get_mista_buffer()
+      call s:assert.equals(mista_buf2, -1)
+      
+      " Toggle to reopen
+      Mista!
+      let mista_buf3 = g:Get_mista_buffer()
+      call s:assert.not_equals(mista_buf3, -1)
+      
+      " Clean up the reopened buffer
+      execute 'bwipeout!' mista_buf3
+    End
+  End
+
+  Describe ':MistaJump'
+    It 'jumps to the correct line in source buffer'
+      " Open Mista with headers
+      Mista ##
+      let mista_buf = g:Get_mista_buffer()
+      execute 'buffer' mista_buf
+      
+      " Move to first header result (line 3, skipping title and empty line)
+      normal! 3G
+      
+      " Execute jump
+      MistaJump
+      
+      " Should be back in source buffer
+      call s:assert.equals(bufnr('%'), s:test_bufnr)
+      
+      " Should be on the correct line (Section One header)
+      call s:assert.match(getline('.'), '^## Section One')
+    End
+
+    It 'shows error when not in Mista buffer'
+      " In the test markdown buffer
+      execute 'buffer' s:test_bufnr
+      
+      try
+        MistaJump
+        call s:assert.fail('Should have shown error')
+      catch
+        " Expected
+      endtry
+    End
+  End
+
+  Describe ':MistaClose'
+    It 'closes the Mista buffer'
+      Mista
+      let mista_buf = g:Get_mista_buffer()
+      call s:assert.not_equals(mista_buf, -1)
+      
+      execute 'buffer' mista_buf
+      MistaClose
+      
+      " Should no longer have a Mista buffer
+      call s:assert.equals(g:Get_mista_buffer(), -1)
+    End
+  End
+
+  Describe ':MistaConfig'
+    It 'sets configuration values'
+      MistaConfig sidebar_width 50
+      call s:assert.equals(g:mista#sidebar_width, 50)
+      
+      " Reset
+      let g:mista#sidebar_width = 40
+    End
+
+    It 'shows configuration values'
+      let original = g:mista#sidebar_width
+      
+      " This would normally echo the value
+      " We can't easily test echo output in themis
+      MistaConfig sidebar_width
+      
+      call s:assert.equals(g:mista#sidebar_width, original)
+    End
+  End
+
+  Describe ':MistaInfo'
+    It 'displays debug information without error'
+      Mista
+      let mista_buf = g:Get_mista_buffer()
+      execute 'buffer' mista_buf
+      
+      " Should not throw error
+      MistaInfo
+      
+      call s:assert.true(1)  " Just verify it runs without error
+    End
+  End
+End
