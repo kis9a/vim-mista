@@ -74,20 +74,6 @@ function! mista#open(bang, arg) abort
   let g:mista#buffer_args[bufnr_src] = a:arg
   let g:mista#buffer_cursor_pos[bufnr_src] = getpos('.')
   
-  if len(g:mista#buffer_state) > 100
-    for buf in keys(g:mista#buffer_state)
-      if !bufexists(str2nr(buf))
-        unlet g:mista#buffer_state[buf]
-        if has_key(g:mista#buffer_args, buf)
-          unlet g:mista#buffer_args[buf]
-        endif
-        if has_key(g:mista#buffer_cursor_pos, buf)
-          unlet g:mista#buffer_cursor_pos[buf]
-        endif
-      endif
-    endfor
-  endif
-  
   if has_key(g:mista#buffer_state, bufnr_src) && 
         \ has_key(g:mista#buffer_state[bufnr_src], 'filter_history') &&
         \ g:mista#buffer_args[bufnr_src] == a:arg
@@ -296,9 +282,15 @@ endfunction
 function! mista#_collect(bufnr, mode, arg) abort
   let lines = getbufline(a:bufnr, 1, '$')
   let matches = []
-  
+  let line_count = len(lines)
+
+  if line_count > g:mista#max_lines
+    echo 'Mista: File too large (' . line_count . ' lines). Set g:mista#max_lines to increase limit.'
+    return []
+  endif
+
   if a:mode ==# 'all'
-    for i in range(len(lines))
+    for i in range(line_count)
       call add(matches, {'line': i + 1, 'text': lines[i]})
     endfor
     
@@ -321,10 +313,23 @@ function! mista#_collect(bufnr, mode, arg) abort
     endfor
     
   else
-    let escaped = mista#_escape_special_chars(a:arg)
-    let pattern = g:mista#case_sensitive ? escaped : '\c' . escaped
-    
-    for i in range(len(lines))
+    if !exists('s:pattern_cache')
+      let s:pattern_cache = {}
+    endif
+
+    let cache_key = printf('%s\t%d', a:arg, g:mista#case_sensitive)
+    if !has_key(s:pattern_cache, cache_key)
+      let escaped = mista#_escape_special_chars(a:arg)
+      let s:pattern_cache[cache_key] = g:mista#case_sensitive ? escaped : '\c' . escaped
+
+      if len(s:pattern_cache) > 50
+        let s:pattern_cache = {}
+        let s:pattern_cache[cache_key] = g:mista#case_sensitive ? escaped : '\c' . escaped
+      endif
+    endif
+    let pattern = s:pattern_cache[cache_key]
+
+    for i in range(line_count)
       if lines[i] =~# pattern
         call add(matches, {'line': i + 1, 'text': lines[i]})
       endif

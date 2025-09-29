@@ -9,6 +9,7 @@ if !exists('g:mista#case_sensitive') | let g:mista#case_sensitive = 0           
 if !exists('g:mista#jump_center')    | let g:mista#jump_center    = 1            | endif
 if !exists('g:mista#header_levels')  | let g:mista#header_levels  = range(1,10)  | endif
 if !exists('g:mista#open_direction') | let g:mista#open_direction = 'leftabove'  | endif
+if !exists('g:mista#max_lines')      | let g:mista#max_lines      = 100000       | endif
 
 if !exists('g:mista#buffer_keymaps_default')
   let g:mista#buffer_keymaps_default = {
@@ -33,18 +34,62 @@ if !exists('g:mista#buffer_args') | let g:mista#buffer_args = {} | endif
 if !exists('g:mista#buffer_cursor_pos') | let g:mista#buffer_cursor_pos = {} | endif
 if !exists('g:mista#buffer_state') | let g:mista#buffer_state = {} | endif
 if !exists('g:mista#mista_cursor_pos') | let g:mista#mista_cursor_pos = {} | endif
+if !exists('g:mista#max_cache_size') | let g:mista#max_cache_size = 20 | endif
+if !exists('g:mista#gc_interval') | let g:mista#gc_interval = 10 | endif
+
+let s:gc_counter = 0
 
 augroup mista_gc
   autocmd!
-  autocmd BufDelete * call s:mista_gc(expand('<abuf>'))
+  autocmd BufDelete * call s:mista_gc_lazy(expand('<abuf>'))
 augroup END
 
-function! s:mista_gc(bufstr) abort
+function! s:mista_gc_lazy(bufstr) abort
   let buf = str2nr(a:bufstr)
-  if has_key(g:mista#buffer_args, buf) | call remove(g:mista#buffer_args, buf) | endif
-  if has_key(g:mista#buffer_cursor_pos, buf) | call remove(g:mista#buffer_cursor_pos, buf) | endif
-  if has_key(g:mista#buffer_state, buf) | call remove(g:mista#buffer_state, buf) | endif
-  if has_key(g:mista#mista_cursor_pos, buf) | call remove(g:mista#mista_cursor_pos, buf) | endif
+
+  " Always clean up the specific buffer being deleted
+  if has_key(g:mista#buffer_state, buf) || has_key(g:mista#buffer_args, buf)
+    call s:mista_gc_buffer(buf)
+  endif
+
+  " Periodically do a full cleanup
+  let s:gc_counter += 1
+  if s:gc_counter >= g:mista#gc_interval
+    let s:gc_counter = 0
+    call s:mista_gc_all()
+  endif
+endfunction
+
+function! s:mista_gc_buffer(buf) abort
+  if has_key(g:mista#buffer_args, a:buf) | call remove(g:mista#buffer_args, a:buf) | endif
+  if has_key(g:mista#buffer_cursor_pos, a:buf) | call remove(g:mista#buffer_cursor_pos, a:buf) | endif
+  if has_key(g:mista#buffer_state, a:buf) | call remove(g:mista#buffer_state, a:buf) | endif
+  if has_key(g:mista#mista_cursor_pos, a:buf) | call remove(g:mista#mista_cursor_pos, a:buf) | endif
+endfunction
+
+function! s:mista_gc_all() abort
+  for buf in keys(g:mista#buffer_state)
+    if !bufexists(str2nr(buf))
+      call s:mista_gc_buffer(str2nr(buf))
+    endif
+  endfor
+
+  if len(g:mista#buffer_state) > g:mista#max_cache_size
+    let items = items(g:mista#buffer_state)
+    " Safe sort with error handling for missing buffers
+    call sort(items, function('s:compare_buffer_lastused'))
+    for i in range(g:mista#max_cache_size, len(items) - 1)
+      call s:mista_gc_buffer(str2nr(items[i][0]))
+    endfor
+  endif
+endfunction
+
+function! s:compare_buffer_lastused(a, b) abort
+  let info_a = getbufinfo(str2nr(a:a[0]))
+  let info_b = getbufinfo(str2nr(a:b[0]))
+  let lastused_a = empty(info_a) ? 0 : get(info_a[0], 'lastused', 0)
+  let lastused_b = empty(info_b) ? 0 : get(info_b[0], 'lastused', 0)
+  return lastused_a < lastused_b ? -1 : lastused_a > lastused_b ? 1 : 0
 endfunction
 
 command! -bang -nargs=?  Mista       call mista#command#open(<bang>0, <q-args>)

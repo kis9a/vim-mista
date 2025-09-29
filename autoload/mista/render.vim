@@ -62,73 +62,75 @@ endfunction
 
 function! s:_render_buffer_content(matches, title) abort
   setlocal modifiable
-  
-  silent! %delete _
-  
-  let lines = []
-  
-  call add(lines, '# ' . a:title)
-  call add(lines, '')
-  
-  for match in a:matches
-    let display_text = match.text
-    let display_text .= ' ⟨' . match.line . '⟩'
-    call add(lines, display_text)
-  endfor
-  
-  call setline(1, lines)
-  
+
+  let save_cursor = getpos('.')
+
+  if line('$') == 1 && getline(1) == ''
+    let lines = []
+    call add(lines, '# ' . a:title)
+    call add(lines, '')
+
+    for match in a:matches
+      let display_text = match.text
+      let display_text .= ' ⟨' . match.line . '⟩'
+      call add(lines, display_text)
+    endfor
+
+    call setline(1, lines)
+  else
+    silent! %delete _
+
+    let lines = []
+    call add(lines, '# ' . a:title)
+    call add(lines, '')
+
+    for match in a:matches
+      let display_text = match.text
+      let display_text .= ' ⟨' . match.line . '⟩'
+      call add(lines, display_text)
+    endfor
+
+    call setline(1, lines)
+  endif
+
+  if save_cursor[1] <= line('$')
+    call setpos('.', save_cursor)
+  endif
+
   setlocal nomodifiable
 endfunction
 
 function! s:_apply_syntax() abort
   if !exists('b:mista_syntax_defined')
     syntax clear
-    
+
     syntax match MistaTitle /^#.*$/
     highlight default link MistaTitle Title
-    
+
     syntax match MistaLineNumber /⟨\d\+⟩$/ conceal
     highlight default link MistaLineNumber Comment
-    
-    if exists('b:mista_source_bufnr') && getbufvar(b:mista_source_bufnr, '&filetype') ==# 'markdown'
-      syntax match MistaHeader1 /^#\s.*$/
-      syntax match MistaHeader2 /^##\s.*$/
-      syntax match MistaHeader3 /^###\s.*$/
-      syntax match MistaHeader4 /^####\s.*$/
-      syntax match MistaHeader5 /^#####\s.*$/
-      syntax match MistaHeader6 /^######\s.*$/
-      
-      highlight default link MistaHeader1 markdownH1
-      highlight default link MistaHeader2 markdownH2
-      highlight default link MistaHeader3 markdownH3
-      highlight default link MistaHeader4 markdownH4
-      highlight default link MistaHeader5 markdownH5
-      highlight default link MistaHeader6 markdownH6
-      
-      syntax region MistaCodeBlock start=/^```/ end=/^```$/
-      highlight default link MistaCodeBlock markdownCodeBlock
-      
-      syntax match MistaInlineCode /`[^`]\+`/
-      highlight default link MistaInlineCode markdownCode
-      
-      syntax match MistaBold /\*\*[^*]\+\*\*/
-      syntax match MistaBold /__[^_]\+__/
-      highlight default link MistaBold markdownBold
-      
-      syntax match MistaItalic /\*[^*]\+\*/
-      syntax match MistaItalic /_[^_]\+_/
-      highlight default link MistaItalic markdownItalic
-      
-      syntax match MistaLink /\[[^\]]\+\]([^)]\+)/
-      highlight default link MistaLink markdownLink
-      
-      syntax match MistaListMarker /^\s*[-*+]\s/
-      syntax match MistaOrderedList /^\s*\d\+\.\s/
-      highlight default link MistaListMarker markdownListMarker
-      highlight default link MistaOrderedList markdownOrderedListMarker
+
+    if exists('b:mista_source_bufnr')
+      let source_ft = getbufvar(b:mista_source_bufnr, '&filetype')
+      if source_ft ==# 'markdown' && !exists('b:mista_markdown_syntax')
+        syntax match MistaHeader1 /^#\s.*$/
+        syntax match MistaHeader2 /^##\s.*$/
+        syntax match MistaHeader3 /^###\s.*$/
+        syntax match MistaHeader4 /^####\s.*$/
+        syntax match MistaHeader5 /^#####\s.*$/
+        syntax match MistaHeader6 /^######\s.*$/
+
+        highlight default link MistaHeader1 markdownH1
+        highlight default link MistaHeader2 markdownH2
+        highlight default link MistaHeader3 markdownH3
+        highlight default link MistaHeader4 markdownH4
+        highlight default link MistaHeader5 markdownH5
+        highlight default link MistaHeader6 markdownH6
+
+        let b:mista_markdown_syntax = 1
+      endif
     endif
-    
+
     let b:mista_syntax_defined = 1
   endif
 endfunction
