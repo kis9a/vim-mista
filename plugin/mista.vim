@@ -10,16 +10,17 @@ if !exists('g:mista#jump_center')    | let g:mista#jump_center    = 1           
 if !exists('g:mista#header_levels')  | let g:mista#header_levels  = range(1,10)  | endif
 if !exists('g:mista#open_direction') | let g:mista#open_direction = 'leftabove'  | endif
 if !exists('g:mista#max_lines')      | let g:mista#max_lines      = 100000       | endif
+if !exists('g:mista#keep_focus_on_navigate') | let g:mista#keep_focus_on_navigate = 1 | endif
 
 if !exists('g:mista#buffer_keymaps_default')
   let g:mista#buffer_keymaps_default = {
-  \ '<CR>':   {'mode': 'n', 'rhs': ':MistaJump<CR>',   'opts': '<silent>'},
-  \ 'mq':     {'mode': 'n', 'rhs': ':MistaClose<CR>',  'opts': '<silent>'},
-  \ 'mp':     {'mode': 'n', 'rhs': ':MistaPrev<CR>',   'opts': '<silent>'},
-  \ 'mn':     {'mode': 'n', 'rhs': ':MistaNext<CR>',   'opts': '<silent>'},
-  \ 'mk':     {'mode': 'n', 'rhs': ':MistaKeep ',      'opts': ''},
-  \ 'mr':     {'mode': 'n', 'rhs': ':MistaReject ',    'opts': ''},
-  \ 'mh':     {'mode': 'n', 'rhs': ':MistaHelp<CR>',   'opts': '<silent>'},
+  \ '<CR>':   {'mode': 'n', 'rhs': ':MistaJump<CR>',       'opts': '<silent>'},
+  \ 'mq':     {'mode': 'n', 'rhs': ':MistaClose<CR>',      'opts': '<silent>'},
+  \ 'mu':     {'mode': 'n', 'rhs': ':MistaFilterUndo<CR>', 'opts': '<silent>'},
+  \ 'mU':     {'mode': 'n', 'rhs': ':MistaFilterRedo<CR>', 'opts': '<silent>'},
+  \ 'mk':     {'mode': 'n', 'rhs': ':MistaKeep ',          'opts': ''},
+  \ 'mr':     {'mode': 'n', 'rhs': ':MistaReject ',        'opts': ''},
+  \ 'mh':     {'mode': 'n', 'rhs': ':MistaHelp<CR>',       'opts': '<silent>'},
   \ }
 endif
 
@@ -61,10 +62,10 @@ function! s:mista_gc_lazy(bufstr) abort
 endfunction
 
 function! s:mista_gc_buffer(buf) abort
-  if has_key(g:mista#buffer_args, a:buf) | call remove(g:mista#buffer_args, a:buf) | endif
-  if has_key(g:mista#buffer_cursor_pos, a:buf) | call remove(g:mista#buffer_cursor_pos, a:buf) | endif
-  if has_key(g:mista#buffer_state, a:buf) | call remove(g:mista#buffer_state, a:buf) | endif
-  if has_key(g:mista#mista_cursor_pos, a:buf) | call remove(g:mista#mista_cursor_pos, a:buf) | endif
+  silent! call remove(g:mista#buffer_args, a:buf)
+  silent! call remove(g:mista#buffer_cursor_pos, a:buf)
+  silent! call remove(g:mista#buffer_state, a:buf)
+  silent! call remove(g:mista#mista_cursor_pos, a:buf)
 endfunction
 
 function! s:mista_gc_all() abort
@@ -97,9 +98,19 @@ command! -nargs=0        MistaJump   call mista#command#jump()
 command! -nargs=0        MistaClose  call mista#command#close()
 command! -nargs=1        MistaKeep   call mista#command#filter_keep(<q-args>)
 command! -nargs=1        MistaReject call mista#command#filter_reject(<q-args>)
-command! -nargs=0        MistaPrev   call mista#command#history_prev()
-command! -nargs=0        MistaNext   call mista#command#history_next()
+command! -nargs=0        MistaFilterUndo call mista#command#filter_undo()
+command! -nargs=0        MistaFilterRedo call mista#command#filter_redo()
 command! -nargs=0        MistaRedraw call mista#command#redraw()
 command! -nargs=*        MistaConfig call mista#command#config(<f-args>)
 command! -nargs=0        MistaInfo   call mista#command#info()
 command! -nargs=0        MistaHelp   call mista#command#help()
+
+" Navigation in source buffer
+command! -nargs=0        MistaGoNext call mista#command#go_next()
+command! -nargs=0        MistaGoPrev call mista#command#go_prev()
+
+" Deprecated commands (for backward compatibility)
+command! -nargs=0        MistaPrev   call mista#command#history_prev_deprecated()
+command! -nargs=0        MistaNext   call mista#command#history_next_deprecated()
+command! -nargs=0        MistaNextMatch call mista#command#next_match_deprecated()
+command! -nargs=0        MistaPrevMatch call mista#command#prev_match_deprecated()

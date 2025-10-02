@@ -76,8 +76,10 @@ nnoremap <Leader>ms :Mista                  " Search (type keyword after)
 | `:MistaClose` | Close the Mista buffer |
 | `:MistaKeep {keyword}` | Keep only lines containing the keyword |
 | `:MistaReject {keyword}` | Reject lines containing the keyword |
-| `:MistaPrev` | Navigate to previous filter state |
-| `:MistaNext` | Navigate to next filter state |
+| `:MistaFilterUndo` | Undo filter operation |
+| `:MistaFilterRedo` | Redo filter operation |
+| `:MistaGoNext` | Navigate to next match in source buffer |
+| `:MistaGoPrev` | Navigate to previous match in source buffer |
 | `:MistaRedraw` | Redraw the current buffer |
 | `:MistaConfig {key} [{value}]` | Get or set configuration values |
 | `:MistaInfo` | Display debug information |
@@ -146,8 +148,8 @@ Inside a Mista buffer, these mappings are available:
 |-----|--------|
 | `<CR>` | Jump to source location |
 | `mq` | Close Mista buffer |
-| `mp` | Go to previous filter state |
-| `mn` | Go to next filter state |
+| `mu` | Undo filter operation |
+| `mU` | Redo filter operation |
 | `mk` | Keep filter (prompts for keyword) |
 | `mr` | Reject filter (prompts for keyword) |
 | `mh` | Show help for Mista buffer mappings |

@@ -19,11 +19,26 @@ function! mista#command#filter_reject(arg) abort
   call mista#filter('reject', a:arg)
 endfunction
 
-function! mista#command#history_prev() abort
+function! mista#command#filter_undo() abort
   call mista#history('prev')
 endfunction
 
-function! mista#command#history_next() abort
+function! mista#command#filter_redo() abort
+  call mista#history('next')
+endfunction
+
+" Deprecated functions with warnings
+function! mista#command#history_prev_deprecated() abort
+  echohl WarningMsg
+  echo 'MistaPrev is deprecated. Use MistaFilterUndo instead.'
+  echohl None
+  call mista#history('prev')
+endfunction
+
+function! mista#command#history_next_deprecated() abort
+  echohl WarningMsg
+  echo 'MistaNext is deprecated. Use MistaFilterRedo instead.'
+  echohl None
   call mista#history('next')
 endfunction
 
@@ -58,13 +73,13 @@ function! mista#command#help() abort
   let eff = deepcopy(g:mista#buffer_keymaps_default)
   for k in keys(g:mista#buffer_keymaps) | let eff[k] = g:mista#buffer_keymaps[k] | endfor
   let labels = {
-        \ ':MistaJump'   : 'Jump to source location',
-        \ ':MistaClose'  : 'Close Mista buffer',
-        \ ':MistaPrev'   : 'Go to previous filter state',
-        \ ':MistaNext'   : 'Go to next filter state',
-        \ ':MistaKeep'   : 'Keep filter (awaits keyword)',
-        \ ':MistaReject' : 'Reject filter (awaits keyword)',
-        \ ':MistaHelp'   : 'Show this help',
+        \ ':MistaJump'      : 'Jump to source location',
+        \ ':MistaClose'     : 'Close Mista buffer',
+        \ ':MistaFilterUndo': 'Undo filter operation',
+        \ ':MistaFilterRedo': 'Redo filter operation',
+        \ ':MistaKeep'      : 'Keep lines with keyword',
+        \ ':MistaReject'    : 'Reject lines with keyword',
+        \ ':MistaHelp'      : 'Show this help',
         \ }
   echo '=== Mista Buffer Mappings (effective) ==='
   echo ''
@@ -79,4 +94,27 @@ function! mista#command#help() abort
   echo ''
   echo 'Press any key to continue...'
   call getchar()
+endfunction
+
+function! mista#command#go_next() abort
+  call mista#navigate_match('next')
+endfunction
+
+function! mista#command#go_prev() abort
+  call mista#navigate_match('prev')
+endfunction
+
+" Deprecated navigation functions
+function! mista#command#next_match_deprecated() abort
+  echohl WarningMsg
+  echo 'MistaNextMatch is deprecated. Use MistaGoNext instead.'
+  echohl None
+  call mista#navigate_match('next')
+endfunction
+
+function! mista#command#prev_match_deprecated() abort
+  echohl WarningMsg
+  echo 'MistaPrevMatch is deprecated. Use MistaGoPrev instead.'
+  echohl None
+  call mista#navigate_match('prev')
 endfunction
