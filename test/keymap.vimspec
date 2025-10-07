@@ -27,8 +27,8 @@ Describe 'Mista Keymaps'
       " Check for expected keys
       call s:assert.has_key(g:mista#buffer_keymaps_default, '<CR>')
       call s:assert.has_key(g:mista#buffer_keymaps_default, 'mq')
-      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mp')
-      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mn')
+      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mu')
+      call s:assert.has_key(g:mista#buffer_keymaps_default, 'mU')
       call s:assert.has_key(g:mista#buffer_keymaps_default, 'mk')
       call s:assert.has_key(g:mista#buffer_keymaps_default, 'mr')
       call s:assert.has_key(g:mista#buffer_keymaps_default, 'mh')
@@ -46,13 +46,13 @@ Describe 'Mista Keymaps'
       call s:assert.true(get(m, 'buffer', 0), 'mq should be buffer-local')
       call s:assert.match(get(m, 'rhs', ''), 'MistaClose')
       
-      let m = maparg('mp', 'n', 0, 1)
-      call s:assert.true(get(m, 'buffer', 0), 'mp should be buffer-local')
-      call s:assert.match(get(m, 'rhs', ''), 'MistaPrev')
-      
-      let m = maparg('mn', 'n', 0, 1)
-      call s:assert.true(get(m, 'buffer', 0), 'mn should be buffer-local')
-      call s:assert.match(get(m, 'rhs', ''), 'MistaNext')
+      let m = maparg('mu', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), 'mu should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaFilterUndo')
+
+      let m = maparg('mU', 'n', 0, 1)
+      call s:assert.true(get(m, 'buffer', 0), 'mU should be buffer-local')
+      call s:assert.match(get(m, 'rhs', ''), 'MistaFilterRedo')
       
       let m = maparg('mk', 'n', 0, 1)
       call s:assert.true(get(m, 'buffer', 0), 'mk should be buffer-local')
@@ -122,7 +122,7 @@ Describe 'Mista Keymaps'
       
       " Check that defaults are still there
       call s:assert.match(maparg('mq', 'n'), 'MistaClose')
-      call s:assert.match(maparg('mp', 'n'), 'MistaPrev')
+      call s:assert.match(maparg('mu', 'n'), 'MistaFilterUndo')
     End
   End
 

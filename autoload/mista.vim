@@ -578,17 +578,24 @@ function! mista#_collect(bufnr, mode, arg) abort
   else
     if !exists('s:pattern_cache')
       let s:pattern_cache = {}
+      let s:cache_access_order = []
     endif
 
     let cache_key = printf('%s\t%d', a:arg, g:mista#case_sensitive)
     if !has_key(s:pattern_cache, cache_key)
       let escaped = mista#_escape_special_chars(a:arg)
       let s:pattern_cache[cache_key] = g:mista#case_sensitive ? escaped : '\c' . escaped
+      call add(s:cache_access_order, cache_key)
 
+      " LRU eviction when cache is full
       if len(s:pattern_cache) > 50
-        let s:pattern_cache = {}
-        let s:pattern_cache[cache_key] = g:mista#case_sensitive ? escaped : '\c' . escaped
+        let oldest_key = remove(s:cache_access_order, 0)
+        unlet s:pattern_cache[oldest_key]
       endif
+    else
+      " Update access order for existing key
+      call filter(s:cache_access_order, 'v:val !=# cache_key')
+      call add(s:cache_access_order, cache_key)
     endif
     let pattern = s:pattern_cache[cache_key]
 

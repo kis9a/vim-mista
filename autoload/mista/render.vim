@@ -13,8 +13,8 @@ function! mista#render#draw(source_bufnr, matches, title) abort
   
   if has_key(g:mista#mista_cursor_pos, a:source_bufnr)
     let saved_line = g:mista#mista_cursor_pos[a:source_bufnr]
-      if saved_line > 0 && saved_line <= line('$')
-      execute saved_line
+    if saved_line > 0 && saved_line <= line('$')
+      call cursor(saved_line, 1)
     endif
   endif
 endfunction
@@ -34,8 +34,8 @@ function! mista#render#restore(source_bufnr, state) abort
   
   if has_key(g:mista#mista_cursor_pos, a:source_bufnr)
     let saved_line = g:mista#mista_cursor_pos[a:source_bufnr]
-      if saved_line > 0 && saved_line <= line('$')
-      execute saved_line
+    if saved_line > 0 && saved_line <= line('$')
+      call cursor(saved_line, 1)
     endif
   endif
 endfunction
